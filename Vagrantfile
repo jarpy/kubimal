@@ -3,6 +3,18 @@
 
 require 'securerandom'
 
+# Get the token needed to add nodes to the cluster, generating a new one if
+# necessary.
+def token
+  unless File.exist?('.token')
+    token = SecureRandom.hex(3) + '.' + SecureRandom.hex(8)
+    File.open('.token', File::WRONLY | File::TRUNC | File::CREAT, 0o0600) do |f|
+      f.write(token)
+    end
+  end
+  File.open('.token').read
+end
+
 @net_prefix = '10.79.29'
 @cluster_size = 3
 @install_script = <<-EOF
@@ -19,17 +31,14 @@ require 'securerandom'
   fi
 EOF
 
-# Get the token needed to add nodes to the cluster, generating a new one if
-# necessary.
-def token
-  unless File.exist?('.token')
-    token = SecureRandom.hex(3) + '.' + SecureRandom.hex(8)
-    File.open('.token', File::WRONLY | File::TRUNC | File::CREAT, 0o0600) do |f|
-      f.write(token)
-    end
-  end
-  File.open('.token').read
-end
+@master_script = <<-EOF
+  test -f /etc/kubernetes/admin.conf || kubeadm init \
+    --token=#{token} \
+    --apiserver-advertise-address=`ip addr | egrep --only-matching '#{@net_prefix}[.][0-9]+'`
+  grep -q '^KUBECONFIG' /etc/environment || echo 'KUBECONFIG=/etc/kubernetes/admin.conf' > /etc/environment
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+  curl -sSL "https://github.com/coreos/flannel/blob/master/Documentation/kube-flannel.yml?raw=true" | kubectl create -f -
+EOF
 
 # Create new cluster node.
 #   node_number: arbitrary number used to name nodes and give them IP addresses
@@ -55,12 +64,7 @@ Vagrant.configure('2') do |config|
   config.vm.provision 'shell', inline: @install_script
 
   # Initialize the master node.
-  master = create_node(
-    1, config,
-    "test -f /etc/kubernetes/admin.conf || kubeadm init --token=#{token} " \
-    "--apiserver-advertise-address=`ip addr | egrep --only-matching '#{@net_prefix}[.][0-9]+'` &&" \
-    "grep -q '^KUBECONFIG' /etc/environment || echo 'KUBECONFIG=/etc/kubernetes/admin.conf' > /etc/environment"
-  )
+  master = create_node(1, config, @master_script)
 
   # Build worker nodes and introduce them to the cluster.
   (2..@cluster_size).each do |n|
