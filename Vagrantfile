@@ -57,9 +57,9 @@ Vagrant.configure('2') do |config|
   # Initialize the master node.
   master = create_node(
     1, config,
-    "kubeadm init --token=#{token} " \
-    '--apiserver-advertise-address=' \
-    "`ip addr | egrep --only-matching '#{@net_prefix}[.][0-9]+'`"
+    "test -f /etc/kubernetes/admin.conf || kubeadm init --token=#{token} " \
+    "--apiserver-advertise-address=`ip addr | egrep --only-matching '#{@net_prefix}[.][0-9]+'` &&" \
+    "grep -q '^KUBECONFIG' /etc/environment || echo 'KUBECONFIG=/etc/kubernetes/admin.conf' > /etc/environment"
   )
 
   # Build worker nodes and introduce them to the cluster.
