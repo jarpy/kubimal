@@ -6,15 +6,17 @@ require 'securerandom'
 @net_prefix = '10.79.29'
 @cluster_size = 3
 @install_script = <<-EOF
-  apt-get clean
-  rm -rf /var/lib/apt/lists/*
-  apt-get update && apt-get full-upgrade
-  apt-get install -y apt-transport-https
-  curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-  echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' > /etc/apt/sources.list.d/kubernetes.list
-  apt-get update
-  apt-get install -y docker-engine
-  apt-get install -y kubelet kubeadm kubectl kubernetes-cni
+  if [[ ! -f /usr/bin/kubeadm ]]; then
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+    apt-get update && apt-get full-upgrade
+    apt-get install -y apt-transport-https
+    curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+    echo 'deb http://apt.kubernetes.io/ kubernetes-xenial main' > /etc/apt/sources.list.d/kubernetes.list
+    apt-get update
+    apt-get install -y docker-engine
+    apt-get install -y kubelet kubeadm kubectl kubernetes-cni
+  fi
 EOF
 
 # Get the token needed to add nodes to the cluster, generating a new one if
